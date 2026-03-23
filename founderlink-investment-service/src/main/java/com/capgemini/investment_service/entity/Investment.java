@@ -1,7 +1,5 @@
 package com.capgemini.investment_service.entity;
 
-import java.time.LocalDateTime;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -24,7 +22,8 @@ public class Investment {
 	
 	private Long startupId;
 	private Long investorId;
+	private String investorEmail;
 	private Double amount;
-	private String status;
-	private LocalDateTime createdAt;
+	private String status; //PENDING, APPROVED, REJECTED
+	private String createdAt;
 }
