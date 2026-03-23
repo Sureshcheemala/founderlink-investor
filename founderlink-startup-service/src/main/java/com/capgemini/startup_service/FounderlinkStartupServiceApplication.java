@@ -1,4 +1,4 @@
-package com.capgemini.user_service;
+package com.capgemini.startup_service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
