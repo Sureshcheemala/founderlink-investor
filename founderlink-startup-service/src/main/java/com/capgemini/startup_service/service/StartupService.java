@@ -10,4 +10,7 @@ public interface StartupService {
 	Startup createStartup(String email, StartupRequest request);
 	
 	List<Startup> getAllStartups();
+	
+	List<Startup> searchStartups(String industry, String stage,
+            Double minFunding, Double maxFunding);
 }

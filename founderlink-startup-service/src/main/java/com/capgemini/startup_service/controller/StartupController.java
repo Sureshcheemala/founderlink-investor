@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.capgemini.startup_service.dto.StartupRequest;
@@ -23,7 +24,7 @@ public class StartupController {
 
     private final StartupService startupService;
 
-    // 🔐 Only founders can create
+    // Only founders can create
     @PostMapping
     @PreAuthorize("hasRole('FOUNDER')")
     public Startup createStartup(
@@ -35,9 +36,21 @@ public class StartupController {
         return startupService.createStartup(email, request);
     }
 
-    // 🔓 Anyone authenticated can view
+    // Anyone authenticated can view
     @GetMapping
     public List<Startup> getAllStartups() {
         return startupService.getAllStartups();
+    }
+    
+    @PreAuthorize("hasAnyRole('FOUNDER','INVESTOR')")
+    @GetMapping("/search")
+    public List<Startup> searchStartups(
+            @RequestParam(required = false) String industry,
+            @RequestParam(required = false) String stage,
+            @RequestParam(required = false) Double minFunding,
+            @RequestParam(required = false) Double maxFunding,
+            @RequestParam(defaultValue = "fundingGoal") String sortBy) {
+
+        return startupService.searchStartups(industry, stage, minFunding, maxFunding);
     }
 }

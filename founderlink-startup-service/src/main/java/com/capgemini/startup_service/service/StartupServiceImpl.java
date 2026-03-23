@@ -36,4 +36,16 @@ public class StartupServiceImpl implements StartupService{
     public List<Startup> getAllStartups() {
         return repository.findAll();
     }
+
+	@Override
+	public List<Startup> searchStartups(String industry, String stage, Double minFunding, Double maxFunding) {
+		List<Startup> startups = repository.findAll();
+
+	    return startups.stream()
+	            .filter(s -> industry == null || s.getIndustry().equalsIgnoreCase(industry))
+	            .filter(s -> stage == null || s.getStage().equalsIgnoreCase(stage))
+	            .filter(s -> minFunding == null || s.getFundingGoal() >= minFunding)
+	            .filter(s -> maxFunding == null || s.getFundingGoal() <= maxFunding)
+	            .toList();
+	}
 }
