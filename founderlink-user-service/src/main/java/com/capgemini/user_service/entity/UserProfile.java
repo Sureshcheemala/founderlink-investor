@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Data
+@Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,6 +17,7 @@ public class UserProfile {
     private String email; // comes from JWT
 
     private String name;
+
     private String bio;
     private String skills;
     private String experience;

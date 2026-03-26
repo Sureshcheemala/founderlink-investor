@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,10 +35,14 @@ public class User {
     private String name;
 
     @Column(unique = true, nullable = false)
+    @Email
     private String email;
 
     @Column(nullable = false)
     private String password;
+    
+    @Builder.Default
+    private boolean isActive = true;
 
     private LocalDateTime createdAt;
     

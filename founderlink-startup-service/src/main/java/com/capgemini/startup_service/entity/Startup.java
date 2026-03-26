@@ -24,5 +24,5 @@ public class Startup {
 
     private String founderEmail; // from JWT
 
-    private String status; // PENDING, APPROVED
+    private String status; // PENDING, APPROVED, REJECTED
 }

@@ -11,6 +11,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.jsonwebtoken.Claims;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -35,8 +37,18 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
+        
+        Claims claims = jwtService.extractAllClaims(token);
 
-        String email = jwtService.extractUsername(token);
+		String email = claims.getSubject();
+		
+		 Boolean isActive = claims.get("isActive", Boolean.class);
+
+		if (isActive != null && !isActive) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("User is blocked");
+            return;
+        }
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 

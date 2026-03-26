@@ -18,7 +18,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
 	private final JwtUtil jwtUtil;
 
-	public static final List<String> openApiEndpoints = List.of("/auth/login", "/auth/register");
+	public static final List<String> openApiEndpoints = List.of("/auth/","/swagger-ui",  "/v3/api-docs");
 
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {

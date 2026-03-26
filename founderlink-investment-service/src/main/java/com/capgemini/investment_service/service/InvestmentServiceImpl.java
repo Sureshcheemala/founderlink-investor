@@ -5,9 +5,18 @@ import java.util.List;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import com.capgemini.investment_service.dto.InvestmentCreatedEvent;
+import com.capgemini.investment_service.config.RabbitMQConstants;
+import com.capgemini.investment_service.dto.FundingRequest;
 import com.capgemini.investment_service.dto.InvestmentRequest;
+import com.capgemini.investment_service.dto.NotificationEvent;
+import com.capgemini.investment_service.dto.StartupResponse;
+import com.capgemini.investment_service.entity.InitiatorType;
 import com.capgemini.investment_service.entity.Investment;
+import com.capgemini.investment_service.entity.InvestmentStatus;
+import com.capgemini.investment_service.exception.BadRequestException;
+import com.capgemini.investment_service.exception.ResourceNotFoundException;
+import com.capgemini.investment_service.exception.UnauthorizedException;
+import com.capgemini.investment_service.feign.StartupClient;
 import com.capgemini.investment_service.repository.InvestmentRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -19,33 +28,168 @@ public class InvestmentServiceImpl implements InvestmentService {
     private final InvestmentRepository repository;
     
     private final RabbitTemplate rabbitTemplate;
+    
+    private final StartupClient startupClient;
 
-    public Investment createInvestment(String email, InvestmentRequest request) {
+    public Investment createInvestment(String investorEmail, InvestmentRequest request) {
+    	
+    	String founderEmail = getFounderEmailFromStartup(request.getStartupId());
 
         Investment investment = Investment.builder()
                 .startupId(request.getStartupId())
-                .investorEmail(email)
+                .investorEmail(investorEmail)
+                .founderEmail(founderEmail)
                 .amount(request.getAmount())
-                .status("PENDING")
-                .createdAt(java.time.LocalDateTime.now().toString())
+                .initiatedBy(InitiatorType.INVESTOR)
+                .status(InvestmentStatus.PENDING)
+                .createdAt(java.time.LocalDateTime.now())
                 .build();
 
-        InvestmentCreatedEvent event = new InvestmentCreatedEvent(
-                investment.getStartupId(),
-                investment.getInvestorEmail(),
-                investment.getAmount()
-        );
+        Investment saved = repository.save(investment);
+
+        sendEvent("INVESTMENT_CREATED", founderEmail,
+                "New investment of ₹ " + request.getAmount() + " has been created", saved.getId());
         
-        rabbitTemplate.convertAndSend("investment.exchange", "investment.created", event);
+        return saved;
+    }
+    
+    public Investment approveInvestment(Long id, String founderEmail) {
+
+        Investment investment = repository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Investment not found"));
+
+
+        if (investment.getStatus() != InvestmentStatus.PENDING) {
+            throw new BadRequestException("Only PENDING investments can be approved");
+        }
+
+        investment.setStatus(InvestmentStatus.APPROVED);
+
+        Investment saved = repository.save(investment);
+
+        sendEvent("INVESTMENT_APPROVED", investment.getInvestorEmail(),
+                "Investment approved for ₹ " + investment.getAmount(), saved.getId());
+
+
+        return saved;
+    }
+    
+    public Investment rejectInvestment(Long id, String founderEmail) {
+
+        Investment investment = repository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Investment not found"));
+
+        if (investment.getStatus() != InvestmentStatus.PENDING) {
+            throw new BadRequestException("Only PENDING investments can be rejected");
+        }
+
+        investment.setStatus(InvestmentStatus.REJECTED);
         
-        return repository.save(investment);
+        Investment saved = repository.save(investment);
+        
+        sendEvent("INVESTMENT_REJECTED", investment.getInvestorEmail(),
+                "Investment rejected for ₹ " + investment.getAmount(), saved.getId());
+
+        return saved;
     }
 
-    public List<Investment> getByStartup(Long startupId) {
+    public List<Investment> getByStartup(Long startupId, String email) {
+    	Investment investment = repository.findById(startupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Not found"));
+    	
+    	if (!investment.getInvestorEmail().equals(email)) {
+            throw new UnauthorizedException("Not allowed");
+        }
         return repository.findByStartupId(startupId);
     }
 
     public List<Investment> getByInvestor(String email) {
         return repository.findByInvestorEmail(email);
     }
+    
+    public List<Investment> getPendingRequests(String investorEmail) {
+        return repository.findByInvestorEmailAndStatusAndInitiatedBy(
+                investorEmail, InvestmentStatus.REQUESTED, InitiatorType.FOUNDER
+        );
+    }
+    
+    public Investment requestInvestment(String founderEmail, FundingRequest fundingRequest) {
+
+        Investment investment = Investment.builder()
+        		.startupId(fundingRequest.getStartupId())
+                .investorEmail(fundingRequest.getInvestorEmail()) // important
+                .founderEmail(founderEmail)
+                .amount(fundingRequest.getAmount())
+                .initiatedBy(InitiatorType.FOUNDER)
+                .status(InvestmentStatus.REQUESTED)
+                .build();
+        
+        Investment saved = repository.save(investment);
+        
+        sendEvent("INVESTMENT_REQUEST", investment.getInvestorEmail(),
+                "Investment Requested for ₹ " + fundingRequest.getAmount(), saved.getId());
+
+        return saved;
+    }
+    
+    public Investment acceptRequest(Long id, String investorEmail) {
+
+        Investment investment = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Not found"));
+
+        if (!investment.getInvestorEmail().equals(investorEmail)) {
+            throw new UnauthorizedException("Not allowed");
+        }
+        
+        investment.setStatus(InvestmentStatus.APPROVED);
+        
+        Investment saved = repository.save(investment);
+        
+        sendEvent("INVESTMENT_ACCEPTED", investment.getFounderEmail(),
+                "Investment accepted for ₹ " + investment.getAmount(), saved.getId());
+
+        return saved;
+    }
+    
+    public Investment rejectRequest(Long id, String investorEmail) {
+
+        Investment investment = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Not found"));
+        
+        if (!investment.getInvestorEmail().equals(investorEmail)) {
+            throw new UnauthorizedException("Not allowed");
+        }
+        
+        investment.setStatus(InvestmentStatus.REJECTED);
+        
+        Investment saved = repository.save(investment);
+        
+        sendEvent("INVESTMENT_REJECTED", investment.getFounderEmail(),
+                "Investment rejected for ₹ " + investment.getAmount(), saved.getId());
+
+        return saved;
+    }
+    
+    public List<Investment> getRequests(String investorEmail) {
+        return repository.findByInvestorEmailAndStatus(investorEmail, InvestmentStatus.REQUESTED);
+    }
+    
+    private void sendEvent(String type, String email, String message, Long id) {
+        NotificationEvent event = new NotificationEvent(type, email, message, id);
+
+        rabbitTemplate.convertAndSend(
+                RabbitMQConstants.EXCHANGE,
+                RabbitMQConstants.ROUTING_KEY,
+                event
+        );
+    }
+    
+    private String getFounderEmailFromStartup(Long startupId) {
+        StartupResponse startup = startupClient.getStartupById(startupId);
+        if (startup == null) {
+            throw new ResourceNotFoundException("Startup not found");
+        }
+        return startup.getFounderEmail();
+    }
+
 }

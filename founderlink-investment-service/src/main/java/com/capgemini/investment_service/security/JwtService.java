@@ -53,4 +53,9 @@ public class JwtService {
             return false;
         }
     }
+    
+//    public Boolean extractIsActive(Claims claims) {
+//        Object active = claims.get("isActive");
+//        return active != null && Boolean.parseBoolean(active.toString());
+//    }
 }

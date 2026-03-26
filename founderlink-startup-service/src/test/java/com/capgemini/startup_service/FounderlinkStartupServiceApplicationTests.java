@@ -1,4 +1,4 @@
-package com.capgemini.user_service;
+package com.capgemini.startup_service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

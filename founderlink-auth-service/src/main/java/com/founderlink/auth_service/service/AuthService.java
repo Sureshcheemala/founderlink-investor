@@ -8,4 +8,8 @@ public interface AuthService {
 	AuthResponse registerUser(RegisterRequest registerRequest);
 	
 	AuthResponse login(LoginRequest loginRequest);
+	
+	AuthResponse refreshToken(String refreshToken);
+	
+	public void blockUser(Long userId);
 }

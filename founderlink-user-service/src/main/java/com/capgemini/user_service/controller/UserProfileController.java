@@ -2,6 +2,9 @@ package com.capgemini.user_service.controller;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -19,12 +22,11 @@ public class UserProfileController {
 
 	@PreAuthorize("hasAnyRole('FOUNDER','INVESTOR','COFOUNDER')")
 	@PostMapping("/profile")
-	public UserProfile createProfile(
+	public UserProfile createOrUpdateProfile(
 	        Authentication authentication,
 	        @RequestBody UserProfileRequest request) {
 
 	    String email = authentication.getName();
-
 	    return userService.createOrUpdateProfile(email, request);
 	}
 
@@ -34,4 +36,25 @@ public class UserProfileController {
 
 		return userService.getProfile(authentication.getName());
 	}
+	
+	@GetMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public UserProfile getUserById(@PathVariable Long id) {
+	    return userService.getUserById(id);
+	}
+	
+	@GetMapping("/admin/users")
+	@PreAuthorize("hasRole('ADMIN')")
+	public List<UserProfile> getAllUsers() {
+	    return userService.getAllUsers();
+	}
+	
+//	@PutMapping("/admin/users/{id}/block")
+//	@PreAuthorize("hasRole('ADMIN')")
+//	public ResponseEntity<String> blockUser(@PathVariable Long id) {
+//
+//	    userService.blockUser(id);
+//
+//	    return ResponseEntity.ok("User blocked successfully");
+//	}
 }

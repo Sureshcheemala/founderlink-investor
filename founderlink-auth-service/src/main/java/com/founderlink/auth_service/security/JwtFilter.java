@@ -42,6 +42,14 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             // Parse ONCE
             Claims claims = jwtService.extractAllClaims(token);
+            
+            Boolean isActive = jwtService.extractIsActive(claims);
+
+            if (isActive != null && !isActive) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().write("User is blocked");
+                return;
+            }
 
             String username = claims.getSubject();
             List<String> roles = jwtService.extractRoles(claims);
@@ -62,9 +70,11 @@ public class JwtFilter extends OncePerRequestFilter {
             }
 
         } catch (Exception e) {
-            
+        	response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        	return;
         }
 
         filterChain.doFilter(request, response);
     }
+    
 }

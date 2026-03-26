@@ -11,6 +11,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.capgemini.user_service.repository.UserProfileRepository;
+
+import io.jsonwebtoken.Claims;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -18,47 +22,57 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
+	private final JwtService jwtService;
 
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                   HttpServletResponse response,
-                                   FilterChain filterChain)
-            throws ServletException, IOException {
+	@Override
+	protected void doFilterInternal(HttpServletRequest request,
+	                               HttpServletResponse response,
+	                               FilterChain filterChain)
+	        throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization");
+	    String authHeader = request.getHeader("Authorization");
 
-        // Skip if no token
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+	    // Skip if no token
+	    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+	        filterChain.doFilter(request, response);
+	        return;
+	    }
 
-        String token = authHeader.substring(7);
+	    String token = authHeader.substring(7);
 
-        String email = jwtService.extractUsername(token);
+	    Claims claims = jwtService.extractAllClaims(token);
+	    
+	    String email = claims.getSubject();
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+	    if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            if (jwtService.validateToken(token)) {
+	        if (jwtService.validateToken(token)) {
 
-                List<String> roles = jwtService.extractRoles(token);
+	            List<String> roles = jwtService.extractRoles(token);
 
-                var authorities = roles.stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .toList();
+	            Boolean isActive = claims.get("isActive", Boolean.class);
 
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(email, null, authorities);
+	            if (isActive != null && !isActive) {
+	                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+	                response.getWriter().write("User is blocked");
+	                return;
+	            }
 
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
+	            // Fix role prefix issue
+	            var authorities = roles.stream()
+	                    .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+	                    .map(SimpleGrantedAuthority::new)
+	                    .toList();
 
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
-        }
+	            UsernamePasswordAuthenticationToken authToken =
+	                    new UsernamePasswordAuthenticationToken(email, null, authorities);
 
-        filterChain.doFilter(request, response);
-    }
+	            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+	            SecurityContextHolder.getContext().setAuthentication(authToken);
+	        }
+	    }
+
+	    filterChain.doFilter(request, response);
+	}
 }
